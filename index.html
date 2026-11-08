@@ -3,7 +3,7 @@
 <body style="margin:0;background:#111917;color:#fff"><p style="font:18px monospace;text-align:center;margin-top:40vh">Loading the detective console…</p><script>
 (async()=>{
 try{
- const parts=await Promise.all(['./game-assets-1.bin?v=b3ba1771f4d76ad8','./game-assets-2.bin?v=b3ba1771f4d76ad8'].map(async path=>{
+ const parts=await Promise.all(['./game-assets-1.bin?v=6d38926ac07f323e','./game-assets-2.bin?v=6d38926ac07f323e'].map(async path=>{
   const response=await fetch(path,{cache:'no-cache'});
   if(!response.ok)throw Error('Keep index.html, game-assets-1.bin and game-assets-2.bin in the same folder.');
   return response.arrayBuffer();
