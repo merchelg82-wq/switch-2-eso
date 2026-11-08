@@ -52,6 +52,7 @@ try{
  window.fetch=(input,options)=>nativeFetch(resolve(input),options);
  const NativeAudio=window.Audio;
  window.Audio=function(src){return new NativeAudio(resolve(src))};window.Audio.prototype=NativeAudio.prototype;
+ window.__belowAsset=resolve;
  const source=texts['index.html'];
  const parsed=new DOMParser().parseFromString(source,'text/html');
  document.title=parsed.title;
@@ -62,7 +63,7 @@ try{
  const scripts=Array.from(parsed.querySelectorAll('script[src]'),s=>s.getAttribute('src').split('?')[0]);
  for(const script of parsed.querySelectorAll('script'))script.remove();
  document.body.innerHTML=parsed.body.innerHTML;document.body.removeAttribute('style');
- for(const path of scripts){const script=document.createElement('script');script.textContent=texts[path]+'\n//# sourceURL=below-portable/'+path;document.body.append(script)}
+ for(const path of scripts){const script=document.createElement('script');script.textContent=rewriteAssets(texts[path]).replace('url(assets/${img}.webp)',"url(${window.__belowAsset('assets/'+img+'.webp')})")+'\n//# sourceURL=below-portable/'+path;document.body.append(script)}
  window.__portableReady=true;document.documentElement.dataset.edition='github-small-files';
 }catch(error){document.body.textContent='The game could not load. '+error.message;console.error(error)}
 })();
