@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111917"><title>Below · The Mortuga Case</title></head>
+<body style="margin:0;background:#111917;color:#fff"><p style="font:18px monospace;text-align:center;margin-top:40vh">Loading the detective console…</p><script>
+(async()=>{
+try{
+ const parts=await Promise.all(['./game-assets-1.bin','./game-assets-2.bin'].map(async path=>{
+  const response=await fetch(path,{cache:'no-cache'});
+  if(!response.ok)throw Error('Keep index.html, game-assets-1.bin and game-assets-2.bin in the same folder.');
+  return response.arrayBuffer();
+ }));
+ const bundle=new Blob(parts);
+ const files=JSON.parse(await new Response(bundle.stream().pipeThrough(new DecompressionStream('gzip'))).text());
+ const urls={},texts={};
+ for(const [path,file] of Object.entries(files)){
+  const bytes=Uint8Array.from(atob(file.data),c=>c.charCodeAt(0));
+  urls[path]=URL.createObjectURL(new Blob([bytes],{type:file.type}));
+  if(/\.(html|css|js)$/.test(path))texts[path]=new TextDecoder().decode(bytes);
+ }
+ const decks={};
+ for(let unit=1;unit<=9;unit++){
+  let page=texts['vocabulary/cards.html'].replace(/const unit = [^;]+;/,'const unit = '+JSON.stringify(String(unit))+';');
+  page=page.replace('<script src="data.js"><'+'/script>','<script src="'+urls['vocabulary/data.js']+'"><'+'/script>');
+  decks[unit]=URL.createObjectURL(new Blob([page],{type:'text/html;charset=utf-8'}));
+ }
+ function resolve(value){
+  if(typeof value!=='string')return value;
+  const clean=value.replace(/&amp;/g,'&').replace(/^\.\//,'').replace(/^\.\.\//,'');
+  if(clean.startsWith('vocabulary/cards.html')){
+   const query=clean.includes('?')?clean.slice(clean.indexOf('?')+1):'';
+   return decks[new URLSearchParams(query).get('unit')||'1']||decks[1];
+  }
+  return urls[clean.split(/[?#]/)[0]]||value;
+ }
+ const rewriteAssets=value=>String(value).replace(/(?:\.\.\/)?assets\/[A-Za-z0-9_./-]+/g,resolve);
+ const rewriteHTML=value=>rewriteAssets(value).replace(/\b(src|href)=(['"])([^'"]+)\2/g,(_,attr,quote,path)=>attr+'='+quote+resolve(path)+quote);
+ // Cover both generated markup and the map's dynamically assigned backgrounds.
+ const inner=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');
+ Object.defineProperty(Element.prototype,'innerHTML',{...inner,set(value){inner.set.call(this,rewriteHTML(value))}});
+ const insert=Element.prototype.insertAdjacentHTML;
+ Element.prototype.insertAdjacentHTML=function(position,value){return insert.call(this,position,rewriteHTML(value))};
+ const nativeSetAttribute=Element.prototype.setAttribute;
+ Element.prototype.setAttribute=function(name,value){return nativeSetAttribute.call(this,name,/^(src|href)$/i.test(name)?resolve(value):value)};
+ const imageSrc=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src');
+ Object.defineProperty(HTMLImageElement.prototype,'src',{...imageSrc,set(value){imageSrc.set.call(this,resolve(value))}});
+ const nativeSetProperty=CSSStyleDeclaration.prototype.setProperty;
+ CSSStyleDeclaration.prototype.setProperty=function(name,value,priority){return nativeSetProperty.call(this,name,rewriteAssets(value),priority)};
+ for(const property of ['background','backgroundImage']){
+  const cssName=property==='backgroundImage'?'background-image':'background';
+  Object.defineProperty(CSSStyleDeclaration.prototype,property,{configurable:true,get(){return this.getPropertyValue(cssName)},set(value){nativeSetProperty.call(this,cssName,rewriteAssets(value),'')}});
+ }
+ const nativeFetch=window.fetch.bind(window);
+ window.fetch=(input,options)=>nativeFetch(resolve(input),options);
+ const NativeAudio=window.Audio;
+ window.Audio=function(src){return new NativeAudio(resolve(src))};window.Audio.prototype=NativeAudio.prototype;
+ const source=texts['index.html'];
+ const parsed=new DOMParser().parseFromString(source,'text/html');
+ document.title=parsed.title;
+ for(const link of parsed.querySelectorAll('link[rel="stylesheet"]')){
+  const path=link.getAttribute('href').split('?')[0],style=document.createElement('style');
+  style.textContent=rewriteAssets(texts[path]);document.head.append(style);
+ }
+ const scripts=Array.from(parsed.querySelectorAll('script[src]'),s=>s.getAttribute('src').split('?')[0]);
+ for(const script of parsed.querySelectorAll('script'))script.remove();
+ document.body.innerHTML=parsed.body.innerHTML;document.body.removeAttribute('style');
+ for(const path of scripts){const script=document.createElement('script');script.textContent=texts[path]+'\n//# sourceURL=below-portable/'+path;document.body.append(script)}
+ window.__portableReady=true;document.documentElement.dataset.edition='github-small-files';
+}catch(error){document.body.textContent='The game could not load. '+error.message;console.error(error)}
+})();
+</script></body></html>
